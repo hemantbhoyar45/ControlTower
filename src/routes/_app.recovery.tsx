@@ -1,49 +1,87 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Check, Circle } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { appHead } from "@/lib/head";
-import { recoveryPlans } from "@/lib/demo/data";
-import { readSession } from "@/lib/session";
-import { PageHeader, DemoBadge, btn, btnPrimarySm } from "@/components/app/ui";
+import { cancelJob, jobsQuery, retryJob } from "@/lib/api";
+import { Empty, PageHeader, Table, TableSkeleton, td } from "@/components/app/ui";
 
 export const Route = createFileRoute("/_app/recovery")({
-  head: appHead("Recovery", "Recovery plans, step tracking and approvals for failed jobs."),
+  head: appHead("Recovery", "Retry failed workloads or cancel jobs in the controlled queue."),
   component: RecoveryPage,
 });
 
 function RecoveryPage() {
-  const [states, setStates] = useState<Record<string, string>>(Object.fromEntries(recoveryPlans.map((p) => [p.id, p.state])));
-  const isAdmin = typeof window !== "undefined" && readSession()?.role === "administrator";
+  const queryClient = useQueryClient();
+  const { data: jobs, isLoading, error } = useQuery(jobsQuery());
+  const recovery = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: "retry" | "cancel" }) =>
+      action === "retry" ? retryJob(id) : cancelJob(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["reports"] });
+    },
+  });
+  const actionable = (jobs ?? []).filter((job) =>
+    ["failed", "queued", "running"].includes(job.status),
+  );
+
   return (
     <div>
-      <PageHeader title="Recovery" subtitle="Guided recovery for failed workloads" actions={<DemoBadge>Simulated actions</DemoBadge>} />
-      <div className="grid gap-6 lg:grid-cols-2">
-        {recoveryPlans.map((p) => {
-          const st = states[p.id];
-          return (
-            <div key={p.id} className="clay p-6">
-              <div className="flex items-center justify-between font-mono text-xs text-muted-foreground"><span>{p.id} · {p.job}</span>
-                <span className={`rounded-full px-2 py-0.5 capitalize ${st === "completed" ? "bg-success/10 text-success" : st === "approved" ? "bg-info/10 text-info" : "bg-warning/15 text-foreground"}`}>{st}</span></div>
-              <h2 className="mt-2 text-lg font-semibold text-navy">{p.title}</h2>
-              <ol className="mt-4 space-y-2.5">
-                {p.steps.map((s) => (
-                  <li key={s.text} className="flex items-center gap-3 text-sm">
-                    {s.done ? <Check className="h-4 w-4 text-success" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
-                    <span className={s.done ? "text-muted-foreground line-through" : ""}>{s.text}</span>
-                  </li>
-                ))}
-              </ol>
-              {st === "awaiting approval" && (
-                <div className="mt-6 flex gap-2">
-                  <button className={btnPrimarySm} disabled={!isAdmin} onClick={() => setStates((x) => ({ ...x, [p.id]: "approved" }))}>Approve (demo)</button>
-                  <button className={btn} onClick={() => setStates((x) => ({ ...x, [p.id]: "rejected" }))}>Reject</button>
-                  {!isAdmin && <span className="self-center text-xs text-muted-foreground">Administrator approval required</span>}
+      <PageHeader
+        title="Recovery"
+        subtitle="Retry failed persisted jobs or cancel queued/running work in the JES2-inspired queue."
+      />
+      {error && (
+        <p className="mb-4 text-sm text-destructive" role="alert">
+          {error.message}
+        </p>
+      )}
+      {recovery.error && (
+        <p className="mb-4 text-sm text-destructive" role="alert">
+          {recovery.error.message}
+        </p>
+      )}
+      {isLoading ? (
+        <TableSkeleton />
+      ) : !actionable.length ? (
+        <Empty text="No failed or active jobs require recovery." />
+      ) : (
+        <Table head={["Job", "Status", "Return code", "Execution steps", "Recovery action"]}>
+          {actionable.map((job) => (
+            <tr key={job.id} className="align-top">
+              <td className={`${td} font-mono text-xs font-medium text-navy`}>{job.name}</td>
+              <td className={`${td} capitalize`}>{job.status}</td>
+              <td className={`${td} font-mono text-xs`}>{job.return_code ?? "—"}</td>
+              <td className={`${td} font-mono text-xs`}>
+                {job.steps.map((step) => `${step.name}:${step.status}`).join(", ")}
+              </td>
+              <td className={td}>
+                <div className="flex flex-wrap gap-2">
+                  {job.status === "failed" && (
+                    <button
+                      type="button"
+                      disabled={recovery.isPending}
+                      onClick={() => recovery.mutate({ id: job.id, action: "retry" })}
+                      className="rounded border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                    >
+                      Retry
+                    </button>
+                  )}
+                  {(job.status === "queued" || job.status === "running") && (
+                    <button
+                      type="button"
+                      disabled={recovery.isPending}
+                      onClick={() => recovery.mutate({ id: job.id, action: "cancel" })}
+                      className="rounded border border-destructive/30 px-2.5 py-1 text-xs font-medium text-destructive hover:bg-destructive/5 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </td>
+            </tr>
+          ))}
+        </Table>
+      )}
     </div>
   );
 }

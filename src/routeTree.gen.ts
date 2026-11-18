@@ -18,6 +18,7 @@ import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppDatasetsRouteImport } from './routes/_app.datasets'
 import { Route as AppDependenciesRouteImport } from './routes/_app.dependencies'
 import { Route as AppFailuresRouteImport } from './routes/_app.failures'
+import { Route as AppJclStudioRouteImport } from './routes/_app.jcl-studio'
 import { Route as AppRecoveryRouteImport } from './routes/_app.recovery'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
@@ -71,6 +72,11 @@ const AppFailuresRoute = AppFailuresRouteImport.update({
   path: '/failures',
   getParentRoute: () => AppRoute,
 } as any)
+const AppJclStudioRoute = AppJclStudioRouteImport.update({
+  id: '/jcl-studio',
+  path: '/jcl-studio',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppRecoveryRoute = AppRecoveryRouteImport.update({
   id: '/recovery',
   path: '/recovery',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/datasets': typeof AppDatasetsRoute
   '/dependencies': typeof AppDependenciesRoute
   '/failures': typeof AppFailuresRoute
+  '/jcl-studio': typeof AppJclStudioRoute
   '/recovery': typeof AppRecoveryRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/datasets': typeof AppDatasetsRoute
   '/dependencies': typeof AppDependenciesRoute
   '/failures': typeof AppFailuresRoute
+  '/jcl-studio': typeof AppJclStudioRoute
   '/recovery': typeof AppRecoveryRoute
   '/reports': typeof AppReportsRoute
   '/settings': typeof AppSettingsRoute
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/_app/datasets': typeof AppDatasetsRoute
   '/_app/dependencies': typeof AppDependenciesRoute
   '/_app/failures': typeof AppFailuresRoute
+  '/_app/jcl-studio': typeof AppJclStudioRoute
   '/_app/recovery': typeof AppRecoveryRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/settings': typeof AppSettingsRoute
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
     | '/datasets'
     | '/dependencies'
     | '/failures'
+    | '/jcl-studio'
     | '/recovery'
     | '/reports'
     | '/settings'
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/datasets'
     | '/dependencies'
     | '/failures'
+    | '/jcl-studio'
     | '/recovery'
     | '/reports'
     | '/settings'
@@ -216,6 +227,7 @@ export interface FileRouteTypes {
     | '/_app/datasets'
     | '/_app/dependencies'
     | '/_app/failures'
+    | '/_app/jcl-studio'
     | '/_app/recovery'
     | '/_app/reports'
     | '/_app/settings'
@@ -298,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFailuresRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/jcl-studio': {
+      id: '/_app/jcl-studio'
+      path: '/jcl-studio'
+      fullPath: '/jcl-studio'
+      preLoaderRoute: typeof AppJclStudioRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/recovery': {
       id: '/_app/recovery'
       path: '/recovery'
@@ -363,6 +382,7 @@ interface AppRouteChildren {
   AppDatasetsRoute: typeof AppDatasetsRoute
   AppDependenciesRoute: typeof AppDependenciesRoute
   AppFailuresRoute: typeof AppFailuresRoute
+  AppJclStudioRoute: typeof AppJclStudioRoute
   AppRecoveryRoute: typeof AppRecoveryRoute
   AppReportsRoute: typeof AppReportsRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -379,6 +399,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDatasetsRoute: AppDatasetsRoute,
   AppDependenciesRoute: AppDependenciesRoute,
   AppFailuresRoute: AppFailuresRoute,
+  AppJclStudioRoute: AppJclStudioRoute,
   AppRecoveryRoute: AppRecoveryRoute,
   AppReportsRoute: AppReportsRoute,
   AppSettingsRoute: AppSettingsRoute,

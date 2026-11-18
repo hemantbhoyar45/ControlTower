@@ -1,47 +1,80 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { appHead } from "@/lib/head";
-import { streams, jobs } from "@/lib/demo/data";
-import { PageHeader, StatusBadge, StatusDot, SectionTitle, Table, td, DemoBadge } from "@/components/app/ui";
+import { displayJobStatus, jobsQuery } from "@/lib/api";
+import { Empty, PageHeader, StatusBadge, Table, TableSkeleton, td } from "@/components/app/ui";
 
 export const Route = createFileRoute("/_app/streams")({
-  head: appHead("Batch Streams", "Health and progress of each batch stream in the nightly cycle."),
+  head: appHead(
+    "Batch Streams",
+    "Live job steps and execution state from the controlled batch queue.",
+  ),
   component: StreamsPage,
 });
 
 function StreamsPage() {
-  const [sel, setSel] = useState(streams[1]!.id);
-  const s = streams.find((x) => x.id === sel)!;
-  const list = jobs.filter((j) => j.stream === sel);
+  const { data: jobs, isLoading, error } = useQuery(jobsQuery());
+  const steps = (jobs ?? []).flatMap((job) => job.steps.map((step) => ({ job, step })));
+  const running = (jobs ?? []).filter((job) => job.status === "running").length;
+  const failed = (jobs ?? []).filter((job) => job.status === "failed").length;
+
   return (
     <div>
-      <PageHeader title="Batch Streams" subtitle="Grouped workloads and their health" actions={<DemoBadge />} />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        {streams.map((x) => {
-          const done = jobs.filter((j) => j.stream === x.id && j.status === "completed").length;
-          const total = jobs.filter((j) => j.stream === x.id).length;
-          return (
-            <button key={x.id} onClick={() => setSel(x.id)} className={`clay p-4 text-left transition ${sel === x.id ? "ring-2 ring-navy/60" : "hover:-translate-y-0.5"}`}>
-              <div className="flex items-center justify-between"><span className="font-mono text-xs text-muted-foreground">{x.prefix}</span><StatusDot s={x.status} /></div>
-              <p className="mt-2 font-semibold text-navy">{x.name}</p>
-              <p className="mt-3 text-3xl font-semibold">{x.health}%</p>
-              <p className="text-xs text-muted-foreground">{x.jobs} jobs · {done}/{total} tracked done</p>
-            </button>
-          );
-        })}
+      <PageHeader
+        title="Batch Streams"
+        subtitle="Execution steps recorded by the JES2-inspired job queue"
+      />
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[
+          ["Jobs", jobs?.length ?? "—"],
+          ["Steps", steps.length],
+          ["Running", running],
+          ["Failed", failed],
+        ].map(([label, value]) => (
+          <div key={label} className="console-kpi p-4">
+            <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
+            <p className="mt-1 font-mono text-2xl font-medium text-navy">{value}</p>
+          </div>
+        ))}
       </div>
-      <section className="mt-8">
-        <SectionTitle right={<StatusBadge s={s.status} />}>{s.name} · window {s.window}</SectionTitle>
-        <Table head={["Job", "Program", "Status", "RC", "Start", "Duration"]}>
-          {list.map((j) => (
-            <tr key={j.id}>
-              <td className={td}><Link to="/jobs/$jobId" params={{ jobId: j.id }} className="font-mono font-medium text-navy hover:underline">{j.id}</Link></td>
-              <td className={`${td} font-mono text-xs`}>{j.program}</td><td className={td}><StatusBadge s={j.status} /></td>
-              <td className={`${td} font-mono text-xs`}>{j.rc}</td><td className={`${td} font-mono text-xs`}>{j.start}</td><td className={`${td} font-mono text-xs`}>{j.duration}</td>
+      {error && (
+        <p className="mb-4 text-sm text-destructive" role="alert">
+          {error.message}
+        </p>
+      )}
+      {isLoading ? (
+        <TableSkeleton />
+      ) : !steps.length ? (
+        <Empty text="No JCL execution steps have been recorded yet." />
+      ) : (
+        <Table head={["Job", "Step", "Program", "Status", "Return code", "Started", "Finished"]}>
+          {steps.map(({ job, step }) => (
+            <tr key={step.id} className="hover:bg-surface">
+              <td className={td}>
+                <Link
+                  to="/jobs/$jobId"
+                  params={{ jobId: job.id }}
+                  className="font-mono text-xs font-medium text-navy hover:underline"
+                >
+                  {job.name}
+                </Link>
+              </td>
+              <td className={`${td} font-mono text-xs`}>{step.name}</td>
+              <td className={`${td} font-mono text-xs`}>{step.program}</td>
+              <td className={td}>
+                <StatusBadge s={displayJobStatus(step.status)} />
+              </td>
+              <td className={`${td} font-mono text-xs`}>{step.return_code ?? "—"}</td>
+              <td className={`${td} font-mono text-xs`}>
+                {step.started_at ? new Date(step.started_at).toLocaleString() : "—"}
+              </td>
+              <td className={`${td} font-mono text-xs`}>
+                {step.finished_at ? new Date(step.finished_at).toLocaleString() : "—"}
+              </td>
             </tr>
           ))}
         </Table>
-      </section>
+      )}
     </div>
   );
 }

@@ -1,12 +1,14 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  LayoutDashboard, ListChecks, Workflow, Network, AlertOctagon, Sparkles, LifeBuoy, FileBarChart,
+  LayoutDashboard, ListChecks, Workflow, Network, AlertOctagon, Sparkles, LifeBuoy, FileBarChart, Code2,
   Database, Settings, Users, ScrollText, Search, Bell, ChevronDown, PanelLeftClose, PanelLeft, Menu, X, LogOut, User,
 } from "lucide-react";
 import { Logo } from "@/components/site";
 import { readSession, clearSession, type Session } from "@/lib/session";
-import { LAST_SYNC, notifications, searchIndex } from "@/lib/demo/data";
+import { notifications, searchIndex } from "@/lib/demo/data";
+import { metricsQuery } from "@/lib/api";
 import { StatusDot } from "@/components/app/ui";
 
 export const Route = createFileRoute("/_app")({ component: AppLayout });
@@ -15,7 +17,8 @@ type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; admin?
 const groups: { title: string; items: NavItem[] }[] = [
   { title: "Overview", items: [{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
   { title: "Operations", items: [
-    { to: "/jobs", label: "Jobs", icon: ListChecks }, { to: "/streams", label: "Batch Streams", icon: Workflow },
+    { to: "/jobs", label: "Jobs", icon: ListChecks }, { to: "/jcl-studio", label: "JCL Studio", icon: Code2 },
+    { to: "/streams", label: "Batch Streams", icon: Workflow },
     { to: "/dependencies", label: "Dependencies", icon: Network }, { to: "/failures", label: "Failures", icon: AlertOctagon },
     { to: "/recovery", label: "Recovery", icon: LifeBuoy },
   ] },
@@ -30,6 +33,7 @@ const groups: { title: string; items: NavItem[] }[] = [
 ];
 
 function AppLayout() {
+  const backend = useQuery(metricsQuery());
   const nav = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
@@ -79,13 +83,20 @@ function AppLayout() {
       </nav>
       {!compact ? (
         <div className="clay m-3 p-3.5">
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Mainframe connection</p>
-          <p className="mt-1.5 flex items-center gap-2 text-sm font-medium"><StatusDot s="completed" /> Connected · MVS-TK5</p>
-          <p className="mt-0.5 font-mono text-xs text-muted-foreground">Last sync {LAST_SYNC}</p>
-          <p className="mt-2 text-[11px] text-muted-foreground">This is currently demo data.</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Local FastAPI backend</p>
+          <p className="mt-1.5 flex items-center gap-2 text-sm font-medium">
+            <StatusDot s={backend.data ? "completed" : backend.isError ? "failed" : "warning"} />
+            {backend.data ? "Connected · SQLite" : backend.isError ? "API unavailable" : "Connecting…"}
+          </p>
+          <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+            {backend.data?.gnucobol_available ? "GnuCOBOL enabled" : "GnuCOBOL unavailable"}
+          </p>
+          <p className="mt-2 text-[11px] text-muted-foreground">JES2 / z/OS behavior is simulated locally.</p>
         </div>
       ) : (
-        <div className="m-3 flex justify-center py-2" title="Connected · demo data"><StatusDot s="completed" /></div>
+        <div className="m-3 flex justify-center py-2" title="Local FastAPI backend">
+          <StatusDot s={backend.data ? "completed" : backend.isError ? "failed" : "warning"} />
+        </div>
       )}
     </div>
   );
@@ -112,7 +123,7 @@ function AppLayout() {
           </button>
           <GlobalSearch />
           <span className="ml-auto hidden items-center gap-1.5 rounded-full bg-warning/15 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-foreground/80 sm:inline-flex">
-            Demo · MVS-TK5
+            Local simulator · not IBM z/OS
           </span>
           <Notifications />
           <UserMenu session={session} onSignOut={() => { clearSession(); nav({ to: "/signin" }); }} />

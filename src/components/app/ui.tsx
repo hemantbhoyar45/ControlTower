@@ -8,6 +8,7 @@ export const statusMeta: Record<JobStatus, { label: string; text: string; bg: st
   failed: { label: "Failed", text: "text-destructive", bg: "bg-destructive/10", dot: "bg-destructive", glyph: "✕" },
   blocked: { label: "Blocked", text: "text-blocked", bg: "bg-blocked/10", dot: "bg-blocked", glyph: "⚠" },
   warning: { label: "Warning", text: "text-warning", bg: "bg-warning/15", dot: "bg-warning", glyph: "!" },
+  cancelled: { label: "Cancelled", text: "text-muted-foreground", bg: "bg-muted", dot: "bg-muted-foreground/50", glyph: "○" },
   waiting: { label: "Waiting", text: "text-muted-foreground", bg: "bg-muted", dot: "bg-muted-foreground/50", glyph: "○" },
 };
 

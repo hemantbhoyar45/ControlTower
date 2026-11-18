@@ -1,5 +1,5 @@
 // Simulated demo data. Replace with FastAPI responses via src/lib/api.
-export type JobStatus = "completed" | "running" | "failed" | "blocked" | "waiting" | "warning";
+export type JobStatus = "completed" | "running" | "failed" | "blocked" | "waiting" | "warning" | "cancelled";
 export type Job = {
   id: string; name: string; stream: string; status: JobStatus; rc: string;
   start: string; duration: string; program: string; owner: string; dependsOn: string[];
