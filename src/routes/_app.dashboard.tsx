@@ -41,10 +41,7 @@ function Dashboard() {
         blocked: 4,
         cancelled: 5,
       };
-      return (
-        priority[a.status] - priority[b.status] ||
-        b.created_at.localeCompare(a.created_at)
-      );
+      return priority[a.status] - priority[b.status] || b.created_at.localeCompare(a.created_at);
     })
     .slice(0, 8);
 

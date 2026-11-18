@@ -14,30 +14,85 @@ COBOL sample programs, and API test instructions, is documented in
 
 The frontend stack is documented in [TECH_STACK.md](./TECH_STACK.md).
 
-## Development
+## Local development (Windows + WSL Ubuntu)
 
-```sh
-git clone <this-repository-url>
-cd mainframe-control-tower
-npm i
-npm run dev
+Run the frontend with Windows Node.js and the backend inside Ubuntu WSL so the
+backend can use GnuCOBOL for real COBOL compilation and indexed-file operations.
+The project directory `E:\Mainframe\Mainframe-Project` is `/mnt/e/Mainframe/Mainframe-Project`
+inside WSL.
+
+Install the backend system packages once in Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install -y gnucobol python3-venv python3-pip
+cobc --version
 ```
 
-Start the FastAPI service in a second terminal for the jobs, datasets, dashboard,
-and reports pages:
+In an Ubuntu terminal, create the Python environment and start the API:
+
+```bash
+cd /mnt/e/Mainframe/Mainframe-Project
+python3 -m venv ~/.venvs/mainframe-control-tower
+source ~/.venvs/mainframe-control-tower/bin/activate
+python -m pip install -r backend/requirements.txt
+export CONTROL_TOWER_DATABASE_PATH=/mnt/e/Mainframe/Mainframe-Project/backend/data/control_tower.db
+export CONTROL_TOWER_CORS_ORIGINS=http://localhost:8081,http://127.0.0.1:8081,http://localhost:5173,http://127.0.0.1:5173
+python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
+```
+
+In a separate PowerShell terminal, install frontend dependencies if needed and
+start Vite. Resolve the current WSL IP because Windows localhost forwarding may
+not be enabled:
 
 ```powershell
-py -m pip install -r backend\requirements.txt
-py -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+Set-Location E:\Mainframe\Mainframe-Project
+npm.cmd install
+$wslIp = (wsl.exe --distribution Ubuntu --user root --exec /bin/hostname -I).Trim().Split(' ')[0]
+$env:CONTROL_TOWER_API_URL = "http://${wslIp}:8000"
+npm.cmd run dev -- --host 127.0.0.1 --port 8081 --strictPort
 ```
 
-Install GnuCOBOL separately and put `cobc` on `PATH` for compiled COBOL
-execution and actual indexed-file VSAM operations. The backend reports compiler
-availability at `/health`; without GnuCOBOL it explicitly identifies the
-limited sample-program interpreter, and VSAM routes return `503`.
+Open `http://127.0.0.1:8081`. Verify the backend with
+`curl.exe "http://${wslIp}:8000/health"`; it should report
+`"executor":"gnucobol"` and `"gnucobol_available":true`. The Vite server
+proxies `/api` and `/health` to that backend. If the backend runs on Windows
+without GnuCOBOL, it explicitly uses the limited sample-program interpreter
+and its VSAM routes return `503`; that mode is not native COBOL or VSAM.
 
-The Vite server proxies API requests to `http://127.0.0.1:8000`. Set
-`CONTROL_TOWER_API_URL` if the backend listens elsewhere.
+### Tests and production build
+
+Run backend tests from Ubuntu:
+
+```bash
+cd /mnt/e/Mainframe/Mainframe-Project
+source ~/.venvs/mainframe-control-tower/bin/activate
+python -m pip install -r backend/requirements-dev.txt
+cd backend
+python -m pytest -q
+```
+
+Run frontend checks from PowerShell:
+
+```powershell
+Set-Location E:\Mainframe\Mainframe-Project
+npm.cmd test
+npx.cmd tsc --noEmit
+npx.cmd eslint src\lib\api\index.ts src\routes\_app.dashboard.tsx src\routes\_app.jobs.index.tsx src\routes\_app.datasets.tsx src\routes\_app.failures.tsx src\routes\_app.recovery.tsx src\routes\_app.reports.tsx
+npm.cmd run build
+```
+
+To compile and run the bundled greeting program directly in Ubuntu:
+
+```bash
+cd /mnt/e/Mainframe/Mainframe-Project/backend/cobol
+cobc -x -o /tmp/GREET GREET.cob
+/tmp/GREET
+```
+
+The backend's VSAM customer API performs actual GnuCOBOL indexed-file
+operations when `/health` reports GnuCOBOL available. JES2 is a local queue
+simulator, not IBM JES2 or z/OS.
 
 ## Scripts
 

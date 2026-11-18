@@ -110,7 +110,10 @@ function DatasetsPage() {
 
   return (
     <div>
-      <PageHeader title="Datasets" subtitle="SQLite batch datasets and GnuCOBOL indexed VSAM customer records" />
+      <PageHeader
+        title="Datasets"
+        subtitle="SQLite batch datasets and GnuCOBOL indexed VSAM customer records"
+      />
       <VsamCustomers />
       <details className="mb-5 rounded-xl border border-border bg-card p-4">
         <summary className="cursor-pointer text-sm font-medium">Create dataset</summary>
@@ -208,8 +211,7 @@ function VsamCustomers() {
     },
   });
   const update = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      updateVsamCustomer(id, name),
+    mutationFn: ({ id, name }: { id: string; name: string }) => updateVsamCustomer(id, name),
     onSuccess: async (customer) => {
       await queryClient.invalidateQueries({ queryKey: ["vsam", "customers"] });
       setEditedNames((current) => ({ ...current, [customer.customer_id]: customer.name }));

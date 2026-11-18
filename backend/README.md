@@ -4,34 +4,51 @@ The FastAPI backend uses SQLAlchemy with SQLite for persisted jobs, steps,
 datasets, and report history. It provides a bounded JES2-inspired worker queue,
 JCL validation and submission, COBOL execution, spool output, and system metrics.
 
-## Run
+## Run locally with GnuCOBOL
 
-From the repository root, install the backend dependencies and start the API:
+For Windows development, run this backend in Ubuntu WSL so `cobc` is available
+to the same process that executes COBOL and accesses the indexed file. Install
+the system packages once in Ubuntu:
 
-```powershell
-py -m pip install -r backend\requirements.txt
-py -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+```bash
+sudo apt update
+sudo apt install -y gnucobol python3-venv python3-pip
+cobc --version
 ```
 
-Open `http://127.0.0.1:8000/docs` for the interactive API. The SQLite database
-is created at `backend\data\control_tower.db` by default. Set
-`CONTROL_TOWER_DATABASE_PATH` to use a different file.
+From an Ubuntu terminal, install Python dependencies and start the API:
 
+```bash
+cd /mnt/e/Mainframe/Mainframe-Project
+python3 -m venv ~/.venvs/mainframe-control-tower
+source ~/.venvs/mainframe-control-tower/bin/activate
+python -m pip install -r backend/requirements.txt
+export CONTROL_TOWER_DATABASE_PATH=/mnt/e/Mainframe/Mainframe-Project/backend/data/control_tower.db
+export CONTROL_TOWER_CORS_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173
+python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
+```
 
-Install GnuCOBOL separately and make `cobc` available on `PATH` to compile and
-run the bundled COBOL programs. `GET /health` reports whether the compiler is
-available. Without it, JCL execution uses the documented small COBOL subset
-interpreter for the sample arithmetic and display programs; this is explicitly
-not GnuCOBOL. VSAM operations return HTTP 503 rather than pretending to access
-an indexed file when the compiler is unavailable.
+Open `http://127.0.0.1:8000/docs` for the interactive API. The database is
+created at `backend/data/control_tower.db` by default; set
+`CONTROL_TOWER_DATABASE_PATH` to use a different file. Check
+`http://127.0.0.1:8000/health` and confirm `gnucobol_available` is `true`
+before testing indexed-file operations. Installing GnuCOBOL in WSL does not
+make `cobc` available to a backend process running directly on Windows.
 
 ## Tests
 
-```powershell
-py -m pip install -r backend\requirements-dev.txt
-Set-Location backend
-py -m pytest
+```bash
+cd /mnt/e/Mainframe/Mainframe-Project
+source ~/.venvs/mainframe-control-tower/bin/activate
+python -m pip install -r backend/requirements-dev.txt
+cd backend
+python -m pytest -q
 ```
+
+The backend tests use GnuCOBOL automatically when `cobc` is on `PATH`; they
+exercise compiled program execution and the indexed-file insert/read/update/
+delete routes. Without `cobc`, tests verify the explicit interpreter fallback
+and that VSAM routes report the feature as unavailable.
 
 ## Job submission and COBOL execution
 

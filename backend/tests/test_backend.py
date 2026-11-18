@@ -36,7 +36,10 @@ def test_parser_rejects_jcl_without_a_job_or_exec() -> None:
         parse_jcl("//EMPTY JOB (ACCT),'EMPTY'\nINVALID")
 
 
-def test_subset_executor_runs_cobol_statements() -> None:
+def test_subset_executor_runs_cobol_statements(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.core.cobol_executor.shutil.which", lambda _: None)
     executor = CobolExecutor(PROGRAMS)
     result = executor.execute("INCR", stdin="0041\n")
 

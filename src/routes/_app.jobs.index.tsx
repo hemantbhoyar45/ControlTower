@@ -11,7 +11,14 @@ export const Route = createFileRoute("/_app/jobs/")({
   component: JobsPage,
 });
 
-const statuses: ("all" | JobStatus)[] = ["all", "queued", "running", "completed", "failed", "cancelled"];
+const statuses: ("all" | JobStatus)[] = [
+  "all",
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+];
 
 function JobsPage() {
   const queryClient = useQueryClient();
