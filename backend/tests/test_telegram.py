@@ -71,12 +71,12 @@ def test_rc_classifications() -> None:
 
     rc8 = classify_return_code(8)
     assert rc8.code_str == "RC 0008"
-    assert rc8.classification == "ERROR"
+    assert rc8.classification == "CRITICAL ERROR"
     assert "🔴" in rc8.emoji
 
     rc12 = classify_return_code(12)
     assert rc12.code_str == "RC 0012"
-    assert rc12.classification == "CRITICAL ERROR"
+    assert rc12.classification == "ADVANCED CRITICAL ERROR"
     assert "🚨" in rc12.emoji
 
     rc130 = classify_return_code(130)
@@ -397,7 +397,7 @@ def test_notification_return_codes() -> None:
             steps=[],
         )
         await notifier.notify_job_completed(job_err, admin_ids={111})
-        assert "RC 0008 – ERROR" in mock_bot.send_message.call_args[1]["text"]
+        assert "RC 0008 – CRITICAL ERROR" in mock_bot.send_message.call_args[1]["text"]
 
         # RC 0012 Critical
         job_crit = Job(
@@ -414,7 +414,7 @@ def test_notification_return_codes() -> None:
             steps=[],
         )
         await notifier.notify_job_completed(job_crit, admin_ids={111})
-        assert "RC 0012 – CRITICAL ERROR" in mock_bot.send_message.call_args[1]["text"]
+        assert "RC 0012 – ADVANCED CRITICAL ERROR" in mock_bot.send_message.call_args[1]["text"]
 
     asyncio.run(_run())
 

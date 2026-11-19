@@ -10,6 +10,36 @@ router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 MAX_JCL_BYTES = 1_000_000
 
 
+def classify_job(return_code: int | None, status_str: str) -> str:
+    if return_code is not None:
+        if return_code == 0:
+            return "SUCCESS"
+        if return_code == 4:
+            return "WARNING"
+        if return_code == 8:
+            return "CRITICAL ERROR"
+        if return_code == 12:
+            return "ADVANCED CRITICAL ERROR"
+        if return_code == 130:
+            return "CANCELLED"
+        if return_code < 4:
+            return "SUCCESS"
+        if return_code < 8:
+            return "WARNING"
+        if return_code < 12:
+            return "CRITICAL ERROR"
+        return "ADVANCED CRITICAL ERROR"
+    if status_str in ("queued", "running"):
+        return status_str.upper()
+    return "UNKNOWN"
+
+
+def _format_job(job) -> JobSchema:
+    schema = JobSchema.model_validate(job)
+    schema.classification = classify_job(job.return_code, job.status)
+    return schema
+
+
 def _submit(content: str, request: Request) -> JobSchema:
     try:
         job = request.app.state.job_service.submit(content)
@@ -17,7 +47,7 @@ def _submit(content: str, request: Request) -> JobSchema:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except JobQueueUnavailable as exc:
         raise HTTPException(status_code=503, detail="The job queue is unavailable.") from exc
-    return JobSchema.model_validate(job)
+    return _format_job(job)
 
 
 @router.post("", response_model=JobSchema, status_code=status.HTTP_202_ACCEPTED)
@@ -46,7 +76,12 @@ def list_jobs(
     offset: int = Query(default=0, ge=0),
 ) -> JobListSchema:
     jobs, total = request.app.state.database.list_jobs(limit, offset)
-    return JobListSchema(items=jobs, total=total, limit=limit, offset=offset)
+    return JobListSchema(
+        items=[_format_job(j) for j in jobs],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/{job_id}/steps", response_model=list[JobStepSchema])
@@ -89,7 +124,7 @@ def retry_job(job_id: str, request: Request) -> JobSchema:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except JobQueueUnavailable as exc:
         raise HTTPException(status_code=503, detail="The job queue is unavailable.") from exc
-    return JobSchema.model_validate(job)
+    return _format_job(job)
 
 
 @router.post("/{job_id}/cancel", response_model=JobSchema)
@@ -102,7 +137,7 @@ def cancel_job(job_id: str, request: Request) -> JobSchema:
     updated = request.app.state.database.get_job(job_id)
     if updated is None:
         raise HTTPException(status_code=404, detail="Job not found.")
-    return JobSchema.model_validate(updated)
+    return _format_job(updated)
 
 
 @router.get("/{job_id}", response_model=JobSchema)
@@ -110,4 +145,4 @@ def get_job(job_id: str, request: Request) -> JobSchema:
     job = request.app.state.database.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found.")
-    return JobSchema.model_validate(job)
+    return _format_job(job)

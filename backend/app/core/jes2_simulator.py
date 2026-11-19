@@ -63,7 +63,7 @@ class JES2Simulator:
                     job_id, "cancelled", 130, "".join(output), "Job cancelled."
                 )
                 return
-            step_status = "completed" if result.return_code == 0 else "failed"
+            step_status = "completed" if result.return_code <= 4 else "failed"
             self.database.finish_step(
                 step.id,
                 step_status,
@@ -75,7 +75,7 @@ class JES2Simulator:
             output.append(f"== {step.name} ({step.program}) ==\n{result.stdout}")
             if result.stderr:
                 errors.append(f"== {step.name} ({step.program}) ==\n{result.stderr}")
-            if result.return_code != 0:
+            if result.return_code > 4:
                 self.database.block_queued_steps(job_id)
                 self.database.finish_job(
                     job_id,
@@ -86,4 +86,6 @@ class JES2Simulator:
                 )
                 return
 
-        self.database.finish_job(job_id, "completed", 0, "".join(output), "\n".join(errors))
+        persisted = self.database.get_job(job_id)
+        final_rc = max((s.return_code or 0 for s in persisted.steps), default=0) if persisted else 0
+        self.database.finish_job(job_id, "completed", final_rc, "".join(output), "\n".join(errors))

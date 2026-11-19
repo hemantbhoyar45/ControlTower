@@ -1,27 +1,23 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from ..core.jcl_parser import parse_jcl
+from ..core.jcl_validator import validate_jcl_content
 from ..schemas.job import (
+    JobSubmission,
     ParsedDDSchema,
     ParsedJCLSchema,
     ParsedStepSchema,
     ProgramListSchema,
     ProgramSchema,
-    JobSubmission,
+    ValidationDiagnosticSchema,
 )
 
 
 router = APIRouter(tags=["jcl", "programs"])
 
 
-@router.post("/api/jcl/parse", response_model=ParsedJCLSchema)
-def parse_submission(submission: JobSubmission) -> ParsedJCLSchema:
-    try:
-        parsed = parse_jcl(submission.content)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+def _to_schema(val_result) -> ParsedJCLSchema:
     return ParsedJCLSchema(
-        job_name=parsed.job_name,
+        job_name=val_result.job_name or "UNNAMED",
         steps=[
             ParsedStepSchema(
                 name=step.name,
@@ -35,39 +31,52 @@ def parse_submission(submission: JobSubmission) -> ParsedJCLSchema:
                     for dd in step.datasets
                 ],
             )
-            for step in parsed.steps
+            for step in val_result.steps
         ],
+        is_valid=val_result.is_valid,
+        errors=val_result.errors,
+        warnings=val_result.warnings,
+        diagnostics=[
+            ValidationDiagnosticSchema(
+                severity=d.severity,
+                rule=d.rule,
+                message=d.message,
+                statement=d.statement,
+                line_number=d.line_number,
+            )
+            for d in val_result.diagnostics
+        ],
+        structure_summary=val_result.structure_summary,
     )
+
+
+@router.post("/api/jcl/parse", response_model=ParsedJCLSchema)
+def parse_submission(submission: JobSubmission) -> ParsedJCLSchema:
+    val_result = validate_jcl_content(submission.content)
+    if not val_result.is_valid:
+        raise HTTPException(status_code=422, detail="; ".join(val_result.errors))
+    return _to_schema(val_result)
 
 
 @router.post("/api/jcl/validate", response_model=ParsedJCLSchema)
 def validate_submission(submission: JobSubmission, request: Request) -> ParsedJCLSchema:
-    parsed = parse_submission(submission)
-    available = set(request.app.state.cobol_executor.list_programs())
-    unavailable = sorted(
-        {step.program for step in parsed.steps if step.program not in available}
-    )
-    if unavailable:
+    executor = request.app.state.cobol_executor
+    database = request.app.state.database
+    val_result = validate_jcl_content(submission.content, executor=executor, database=database)
+    if not val_result.is_valid:
         raise HTTPException(
             status_code=422,
-            detail=f"COBOL program(s) are not in the approved library: {', '.join(unavailable)}.",
+            detail="; ".join(val_result.errors),
         )
-    missing_input_datasets = sorted(
-        {
-            dd.dataset
-            for step in parsed.steps
-            for dd in step.datasets
-            if dd.name == "SYSIN"
-            and dd.dataset
-            and request.app.state.database.get_dataset(dd.dataset) is None
-        }
-    )
-    if missing_input_datasets:
-        raise HTTPException(
-            status_code=422,
-            detail=f"SYSIN dataset(s) do not exist: {', '.join(missing_input_datasets)}.",
-        )
-    return parsed
+    return _to_schema(val_result)
+
+
+@router.post("/api/jcl/inspect", response_model=ParsedJCLSchema)
+def inspect_submission(submission: JobSubmission, request: Request) -> ParsedJCLSchema:
+    executor = request.app.state.cobol_executor
+    database = request.app.state.database
+    val_result = validate_jcl_content(submission.content, executor=executor, database=database)
+    return _to_schema(val_result)
 
 
 @router.get("/api/programs", response_model=ProgramListSchema, tags=["programs"])

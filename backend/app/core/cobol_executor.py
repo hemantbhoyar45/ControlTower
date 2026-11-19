@@ -208,6 +208,8 @@ def _interpret(source: str, stdin: str) -> ExecutionResult:
     if not in_procedure:
         raise CobolExecutionError("The COBOL program has no PROCEDURE DIVISION.")
 
+    fields["RETURN-CODE"] = _Field("9", 4, 0)
+
     input_lines = iter(stdin.splitlines())
     output: list[str] = []
     for statement in statements:
@@ -259,7 +261,8 @@ def _interpret(source: str, stdin: str) -> ExecutionResult:
         else:
             raise CobolExecutionError(f"Unsupported COBOL statement: {command}")
 
-    return ExecutionResult(0, "".join(f"{line}\n" for line in output), "", "cobol-subset-interpreter")
+    rc = int(fields.get("RETURN-CODE", _Field("9", 4, 0)).value)
+    return ExecutionResult(rc, "".join(f"{line}\n" for line in output), "", "cobol-subset-interpreter")
 
 
 def _code_from_source_line(raw_line: str) -> str:

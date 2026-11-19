@@ -30,6 +30,7 @@ export interface Job {
   stdout: string;
   stderr: string;
   steps: JobStep[];
+  classification?: string | null;
 }
 
 export interface Dataset {
@@ -65,6 +66,14 @@ export interface ReportSummary {
   daily: DailyReport[];
 }
 
+export interface ValidationDiagnostic {
+  severity: "info" | "warning" | "error";
+  rule: string;
+  message: string;
+  statement?: string | null;
+  line_number?: number | null;
+}
+
 export interface ParsedJCL {
   job_name: string;
   steps: {
@@ -72,6 +81,11 @@ export interface ParsedJCL {
     program: string;
     datasets: { name: string; dataset: string | null; inline_data: string[] }[];
   }[];
+  is_valid?: boolean;
+  errors?: string[];
+  warnings?: string[];
+  diagnostics?: ValidationDiagnostic[];
+  structure_summary?: string;
 }
 
 export interface SystemMetrics {
@@ -234,6 +248,13 @@ export const reportJobsQuery = () =>
 
 export function validateJcl(content: string): Promise<ParsedJCL> {
   return request<ParsedJCL>("/api/jcl/validate", {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  });
+}
+
+export function inspectJcl(content: string): Promise<ParsedJCL> {
+  return request<ParsedJCL>("/api/jcl/inspect", {
     method: "POST",
     body: JSON.stringify({ content }),
   });

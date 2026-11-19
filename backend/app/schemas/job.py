@@ -36,6 +36,7 @@ class JobSchema(BaseModel):
     stdout: str
     stderr: str
     steps: list[JobStepSchema] = Field(default_factory=list)
+    classification: str | None = None
 
 
 class JobListSchema(BaseModel):
@@ -57,9 +58,22 @@ class ParsedStepSchema(BaseModel):
     datasets: list[ParsedDDSchema]
 
 
+class ValidationDiagnosticSchema(BaseModel):
+    severity: str
+    rule: str
+    message: str
+    statement: str | None = None
+    line_number: int | None = None
+
+
 class ParsedJCLSchema(BaseModel):
     job_name: str
     steps: list[ParsedStepSchema]
+    is_valid: bool = True
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    diagnostics: list[ValidationDiagnosticSchema] = Field(default_factory=list)
+    structure_summary: str = ""
 
 
 class ProgramSchema(BaseModel):

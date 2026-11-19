@@ -29,21 +29,21 @@ def classify_return_code(rc: int | None) -> ReturnCodeInfo:
             code_str="RC 0004",
             classification="WARNING",
             emoji="🟡",
-            description="Warning. Minor anomalies or acceptable conditions detected.",
+            description="Warning. Minor anomalies or acceptable conditions detected that do not prevent execution.",
         )
     if rc == 8:
         return ReturnCodeInfo(
             code_str="RC 0008",
-            classification="ERROR",
+            classification="CRITICAL ERROR",
             emoji="🔴",
-            description="Error. Step failed or data error encountered; execution interrupted.",
+            description="Critical Error. The JCL or job execution encounters a serious error that prevents successful processing.",
         )
     if rc == 12:
         return ReturnCodeInfo(
             code_str="RC 0012",
-            classification="CRITICAL ERROR",
+            classification="ADVANCED CRITICAL ERROR",
             emoji="🚨",
-            description="Critical Error. Severe mainframe failure; processing aborted immediately.",
+            description="Advanced Critical Error. Severe execution or system-level failure requiring special attention.",
         )
     if rc == 130:
         return ReturnCodeInfo(
@@ -69,13 +69,13 @@ def classify_return_code(rc: int | None) -> ReturnCodeInfo:
     if rc < 12:
         return ReturnCodeInfo(
             code_str=f"RC {rc:04d}",
-            classification="ERROR",
+            classification="CRITICAL ERROR",
             emoji="🔴",
-            description=f"Job failure encountered with return code {rc}.",
+            description=f"Critical error condition encountered with return code {rc}.",
         )
     return ReturnCodeInfo(
         code_str=f"RC {rc:04d}",
-        classification="CRITICAL ERROR",
+        classification="ADVANCED CRITICAL ERROR",
         emoji="🚨",
-        description=f"Severe failure encountered with return code {rc}.",
+        description=f"Advanced critical failure encountered with return code {rc}.",
     )
