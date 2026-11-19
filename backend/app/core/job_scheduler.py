@@ -1,8 +1,10 @@
+from collections.abc import Callable
 import logging
 import queue
 import threading
 
 from ..database.connection import Database
+from ..database.models import Job
 from .cobol_executor import CobolExecutor
 from .jes2_simulator import JES2Simulator
 
@@ -20,6 +22,23 @@ class JobScheduler:
         self._stopping = threading.Event()
         self._active: dict[str, threading.Event] = {}
         self._active_lock = threading.Lock()
+        self._completion_listeners: list[Callable[[Job], None]] = []
+
+    def add_completion_listener(self, listener: Callable[[Job], None]) -> None:
+        self._completion_listeners.append(listener)
+
+    def _notify_completion(self, job_id: str) -> None:
+        try:
+            job = self.database.get_job(job_id)
+            if job is None:
+                return
+            for listener in list(self._completion_listeners):
+                try:
+                    listener(job)
+                except Exception as exc:
+                    logger.exception("Error in job completion listener: %s", exc)
+        except Exception as exc:
+            logger.exception("Could not notify completion for job %s: %s", job_id, exc)
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -49,6 +68,7 @@ class JobScheduler:
 
     def cancel(self, job_id: str) -> bool:
         if self.database.cancel_queued_job(job_id):
+            self._notify_completion(job_id)
             return True
         with self._active_lock:
             cancel_event = self._active.get(job_id)
@@ -77,6 +97,7 @@ class JobScheduler:
                     finally:
                         with self._active_lock:
                             self._active.pop(job_id, None)
+                    self._notify_completion(job_id)
             except Exception as exc:
                 logger.exception("Job %s could not be executed", job_id)
                 if job_id is not None:
@@ -84,5 +105,6 @@ class JobScheduler:
                         self.database.fail_job(job_id, str(exc))
                     except Exception:
                         logger.exception("Could not persist failure for job %s", job_id)
+                    self._notify_completion(job_id)
             finally:
                 self._pending.task_done()

@@ -20,6 +20,7 @@ from .services.dataset_service import DatasetService
 from .services.job_service import JobService
 from .services.report_service import ReportService
 from .services.vsam_service import VsamService
+from .telegram import TelegramBotService, router as telegram_router
 
 
 def create_app(
@@ -27,6 +28,7 @@ def create_app(
     programs_directory: Path | None = None,
     execution_timeout: int = 10,
     vsam_directory: Path | None = None,
+    enable_telegram: bool = True,
 ) -> FastAPI:
     database = Database(database_path or configured_database_path())
     executor = CobolExecutor(
@@ -40,19 +42,34 @@ def create_app(
     vsam_service = VsamService(
         executor, vsam_directory or DEFAULT_VSAM_DIRECTORY
     )
+    telegram_service = (
+        TelegramBotService(
+            database=database,
+            scheduler=scheduler,
+            executor=executor,
+            dataset_service=dataset_service,
+            job_service=job_service,
+        )
+        if enable_telegram
+        else None
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         database.initialize()
         scheduler.start()
+        if telegram_service and telegram_service.token:
+            await telegram_service.start()
         try:
             yield
         finally:
+            if telegram_service and telegram_service.token:
+                await telegram_service.stop()
             scheduler.stop()
 
     app = FastAPI(
         title="Mainframe Control Tower API",
-        description="SQLite-backed batch job, COBOL execution, and dataset services.",
+        description="SQLite-backed batch job, COBOL execution, dataset services, and Telegram bot.",
         version="1.0.0",
         lifespan=lifespan,
     )
@@ -69,6 +86,7 @@ def create_app(
     app.state.job_service = job_service
     app.state.report_service = report_service
     app.state.vsam_service = vsam_service
+    app.state.telegram_service = telegram_service
 
     @app.get("/health", response_model=HealthSchema, tags=["health"])
     def health() -> HealthSchema:
@@ -84,6 +102,7 @@ def create_app(
     app.include_router(reports.router)
     app.include_router(metrics.router)
     app.include_router(vsam.router)
+    app.include_router(telegram_router)
     return app
 
 
